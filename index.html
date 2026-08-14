@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Chat Seguro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root{
+    --bg: #0b0f14;
+    --panel: #121821;
+    --line: #1f2937;
+    --text: #e6edf3;
+    --dim: #7d8a9b;
+    --accent: #29d9c4;
+    --accent-dim: #16564f;
+    --warn: #e0a939;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display:flex;
+    justify-content:center;
+    padding: 24px 16px;
+  }
+
+  .app{
+    width:100%;
+    max-width: 640px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 14px;
+  }
+
+  header h1{
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin:0;
+    color: var(--text);
+  }
+  header h1 span{ color: var(--accent); }
+
+  header .subtitle{
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--dim);
+  }
+
+  .selector-row{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--dim);
+  }
+
+  select{
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: var(--sans);
+    font-size: 13px;
+  }
+
+  #chat-window{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+    min-height: 420px;
+    max-height: 60vh;
+    overflow-y: auto;
+    display:flex;
+    flex-direction:column;
+    gap: 12px;
+  }
+
+  .bubble{
+    max-width: 78%;
+    padding: 10px 13px;
+    border-radius: 10px;
+    line-height: 1.4;
+    font-size: 14px;
+    position: relative;
+    animation: rise 0.15s ease-out;
+  }
+  @keyframes rise{ from{ opacity:0; transform: translateY(4px);} to{opacity:1; transform:none;} }
+
+  .bubble.mine{
+    align-self: flex-end;
+    background: var(--accent-dim);
+    border: 1px solid #1f7f74;
+    border-bottom-right-radius: 2px;
+  }
+  .bubble.theirs{
+    align-self: flex-start;
+    background: #17202b;
+    border: 1px solid var(--line);
+    border-bottom-left-radius: 2px;
+  }
+
+  .bubble .meta{
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--dim);
+    margin-bottom: 4px;
+    display:flex;
+    gap:8px;
+  }
+
+  .status-tag{
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 999px;
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+  }
+  .status-tag.unverified{
+    color: var(--warn);
+    background: rgba(224, 169, 57, 0.12);
+    border: 1px solid rgba(224, 169, 57, 0.35);
+  }
+  .status-tag.verified{
+    color: var(--accent);
+    background: rgba(41, 217, 196, 0.1);
+    border: 1px solid rgba(41, 217, 196, 0.35);
+  }
+
+  .composer{
+    display:flex;
+    gap:8px;
+  }
+
+  .composer input{
+    flex:1;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: var(--sans);
+  }
+  .composer input:focus{
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .composer button{
+    background: var(--accent);
+    color: #04211d;
+    border: none;
+    border-radius: 8px;
+    padding: 0 20px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .composer button:hover{ opacity: 0.85; }
+  .composer button:disabled{ opacity: 0.4; cursor: default; }
+
+  .empty-state{
+    margin: auto;
+    color: var(--dim);
+    font-family: var(--mono);
+    font-size: 12px;
+    text-align:center;
+  }
+
+  .flow-note{
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--dim);
+    text-align:center;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div>
+      <h1>Chat<span>Seguro</span></h1>
+      <div class="subtitle">Cifrado en cada mensaje</div>
+    </div>
+  </header>
+
+  <div class="selector-row">
+    <span>Yo soy:</span>
+    <select id="yo"></select>
+    <span>Hablando con:</span>
+    <select id="con"></select>
+  </div>
+
+  <div id="chat-window">
+    <div class="empty-state">Selecciona dos usuarios para empezar a chatear</div>
+  </div>
+
+  <div class="composer">
+    <input id="texto" type="text" placeholder="Escribe un mensaje..." disabled>
+    <button id="enviar" disabled>Enviar</button>
+  </div>
+</div>
+
+<script>
+// URL del backend intermedio (backend_chat.py)
+const BACKEND_URL = "http://127.0.0.1:8001";
+
+const selYo = document.getElementById("yo");
+const selCon = document.getElementById("con");
+const chatWindow = document.getElementById("chat-window");
+const inputTexto = document.getElementById("texto");
+const btnEnviar = document.getElementById("enviar");
+
+let usuarios = [];
+let pollingId = null;
+
+// =====================================================================
+// Cargar usuarios disponibles y sincronizar selectores
+// =====================================================================
+async function cargarUsuarios() {
+  const res = await fetch(`${BACKEND_URL}/chat/usuarios`);
+  usuarios = await res.json();
+
+  // 1. Llenar "Yo soy:" con todos los usuarios de la BD
+  selYo.innerHTML = "";
+  usuarios.forEach(u => {
+    const opt = document.createElement("option");
+    opt.value = u.id;
+    opt.textContent = u.nombre;
+    selYo.appendChild(opt);
+  });
+
+  // 2. Llenar "Hablando con:" excluyendo al usuario seleccionado en "Yo soy:"
+  actualizarOpcionesHablandoCon();
+
+  activarChat();
+}
+
+// Función auxiliar que filtra el segundo selector
+function actualizarOpcionesHablandoCon() {
+  const yoId = selYo.value;
+  const valorAnteriorCon = selCon.value;
+
+  selCon.innerHTML = "";
+
+  // Filtrar para que NO aparezca el mismo usuario
+  const usuariosDisponibles = usuarios.filter(u => String(u.id) !== String(yoId));
+
+  usuariosDisponibles.forEach(u => {
+    const opt = document.createElement("option");
+    opt.value = u.id;
+    opt.textContent = u.nombre;
+    selCon.appendChild(opt);
+  });
+
+  if (usuariosDisponibles.some(u => String(u.id) === String(valorAnteriorCon))) {
+    selCon.value = valorAnteriorCon;
+  }
+}
+
+function activarChat() {
+  inputTexto.disabled = false;
+  btnEnviar.disabled = false;
+  refrescarMensajes();
+
+  // if (pollingId) clearInterval(pollingId);
+  // pollingId = setInterval(refrescarMensajes, 10000); // auto-refresh cada 10s
+}
+
+// =====================================================================
+// Pedir al backend los mensajes de la conversación actual
+// (el backend ya se encargó de leer BD, descifrar y verificar)
+// =====================================================================
+async function refrescarMensajes() {
+  const yo = selYo.value;
+  const con = selCon.value;
+  if (!yo || !con || yo === con) return;
+
+  const res = await fetch(`${BACKEND_URL}/chat/mensajes/${yo}/${con}`);
+  const mensajes = await res.json();
+  pintarMensajes(mensajes, parseInt(yo));
+}
+
+function pintarMensajes(mensajes, yoId) {
+  chatWindow.innerHTML = "";
+
+  if (mensajes.length === 0) {
+    chatWindow.innerHTML = `<div class="empty-state">Aún no hay mensajes en esta conversación</div>`;
+    return;
+  }
+
+  mensajes.forEach(m => {
+    const bubble = document.createElement("div");
+    bubble.className = "bubble " + (m.remitente_id === yoId ? "mine" : "theirs");
+
+    const hora = new Date(m.timestamp).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+
+    const tagClass = m.verificado ? "verified" : "unverified";
+    const tagText = m.verificado ? "Mensaje verificado" : "No verificado";
+
+    bubble.innerHTML = `
+      <div class="meta">
+        <span>${m.remitente_nombre}</span>
+        <span>${hora}</span>
+        <span class="status-tag ${tagClass}">${tagText}</span>
+      </div>
+      <div>${escapeHtml(m.texto)}</div>
+    `;
+    chatWindow.appendChild(bubble);
+  });
+
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// =====================================================================
+// Enviar mensaje: el backend se encarga de cifrar + firmar + guardar
+// =====================================================================
+async function enviarMensaje() {
+  const texto = inputTexto.value.trim();
+  if (!texto) return;
+
+  const remitente_id = parseInt(selYo.value);
+  const destinatario_id = parseInt(selCon.value);
+
+  if (remitente_id === destinatario_id) {
+    alert("Elige dos usuarios distintos para chatear.");
+    return;
+  }
+
+  btnEnviar.disabled = true;
+  try {
+    await fetch(`${BACKEND_URL}/chat/enviar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ remitente_id, destinatario_id, texto }),
+    });
+    inputTexto.value = "";
+    await refrescarMensajes();
+  } catch (err) {
+    alert("Error enviando el mensaje. ¿Están corriendo cia_api.py y backend_chat.py?");
+  } finally {
+    btnEnviar.disabled = false;
+    inputTexto.focus();
+  }
+}
+
+  btnEnviar.addEventListener("click", enviarMensaje);
+  inputTexto.addEventListener("keydown", e => {
+    if (e.key === "Enter") enviarMensaje();
+  });
+
+  selYo.addEventListener("change", () => {
+    actualizarOpcionesHablandoCon();
+    refrescarMensajes();
+  });
+
+  selCon.addEventListener("change", refrescarMensajes);
+
+  cargarUsuarios();
+</script>
+
+</body>
+</html>
